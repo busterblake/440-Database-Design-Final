@@ -19,13 +19,11 @@ def pretty_datetime(value: str) -> str:
     if not value:
         return ''
     try:
-        # Handle values like '2025-12-10T09:00', '2025-12-10 09:00', or with seconds/timezone
         text = str(value).replace(' ', 'T')
-        # Trim to seconds to keep fromisoformat happy even if timezone present
         if len(text) > 19:
             text = text[:19]
         dt = datetime.fromisoformat(text)
-        return dt.strftime('%b %d, %Y %I:%M %p')  # e.g., Dec 10, 2025 09:00 AM
+        return dt.strftime('%b %d, %Y %I:%M %p')
     except Exception:
         return str(value)
 
@@ -43,7 +41,6 @@ except Exception as e:
 def index():
     try:
         tables = {}
-        # Show a summary of key tables in the schema
         table_names = [
             "Building",
             "Department",
@@ -58,7 +55,7 @@ def index():
             "Class Request",
         ]
         
-        # Fetch data from each table
+        # Fetch data from each table listed above
         for table_name in table_names:
             try:
                 table_response = supabase.table(table_name).select("*").execute()
@@ -78,7 +75,7 @@ def login():
         role = request.form.get('role')
         password = request.form.get('password')
         
-        # Check credentials: admin/admin, secretary/secretary
+        # Check credentials: U:admin/P:admin, U:secretary/P:secretary
         valid_credentials = {
             'admin': 'admin',
             'secretary': 'secretary'
@@ -94,13 +91,11 @@ def login():
 
 @app.route('/student')
 def student():
-    # Public search interface: no login required, read-only
     class_number = request.args.get('class_number', '').strip()
     building_id = request.args.get('building_id', '').strip()
     dept_id = request.args.get('dept_id', '').strip()
     time_filter = request.args.get('time', '').strip()
 
-    # Load lookup tables
     buildings = []
     departments = []
     try:
@@ -112,7 +107,6 @@ def student():
     except Exception as e:
         print('Error fetching departments for student search:', e)
 
-    # Load core scheduling data and join in Python
     sections = []
     courses = []
     room_assignments = []
@@ -138,7 +132,6 @@ def student():
     course_by_id = {c.get('course_id'): c for c in courses}
     room_by_id = {r.get('room_id'): r for r in rooms}
 
-    # Map departments by their primary key; your schema uses department_id
     dept_by_id = {}
     for d in departments:
         dept_key = d.get('department_id') or d.get('dept_id') or d.get('id')
@@ -146,10 +139,8 @@ def student():
             dept_by_id[dept_key] = d
 
     results = []
-    # Track which **courses** actually have room assignments so we can
-    # build a dropdown of available classes (by course) for students to search.
+    # Track which courses actually have room assignments so we can have a driopdown
     available_courses = {}
-    # Helper to parse stored datetimes down to minutes
     def _to_minute_dt(value: str):
         if not value:
             return None
@@ -165,13 +156,10 @@ def student():
         s = section_by_id.get(ra.get('section_id'))
         if not s:
             continue
-        # Course lookup with tolerant key handling
         course_id_val = s.get('course_id') or s.get('courseID') or s.get('course')
         c = course_by_id.get(course_id_val) if course_id_val is not None else None
-        # Department is optional for displaying results; try best-effort lookup
         dept_id_val = None
         if c:
-            # Your Course table likely stores the FK as dept_id
             dept_id_val = (
                 c.get('dept_id')
                 or c.get('department_id')
@@ -179,18 +167,14 @@ def student():
             )
         d = dept_by_id.get(dept_id_val) if dept_id_val is not None else None
         r = room_by_id.get(ra.get('room_id'))
-        # Require a valid course and room assignment; department is optional
         if not (c and r):
             continue
 
-        # Friendly fields with fallbacks so we don't end up with a bunch of None values
-        # Your Course table uses course_id and name
         course_id_out = c.get('course_id') or c.get('id')
         course_name_out = c.get('name') or c.get('course_name')
         dept_id_out = dept_id_val
         dept_name_out = None
         if d:
-            # Your Department schema uses `name` for the department name
             dept_name_out = (
                 d.get('name')
                 or d.get('dept_name')
@@ -212,13 +196,10 @@ def student():
             'room_num': r.get('room_num'),
             'room_type': r.get('room_type'),
             'max_capacity': r.get('max_capacity'),
-            # Room Assignment table uses 'start' and 'end' columns
             'assign_start': ra.get('start'),
             'assign_end': ra.get('end'),
         }
 
-        # Apply filters
-        # Class filter uses course_id so students choose a specific class (e.g., COMP 440)
         if class_number and str(row.get('course_id')) != class_number:
             continue
         if building_id and str(row.get('building_id')) != building_id:
@@ -226,8 +207,8 @@ def student():
         if dept_id and str(row.get('dept_id')) != dept_id:
             continue
         if time_filter:
-            # Expect HH:MM from a time input; if parsing fails, fall back to simple substring match
-            from datetime import time as _time_cls  # local alias to avoid confusion
+            # Expect HH:MM 
+            from datetime import time as _time_cls 
             req_time = None
             try:
                 req_time = datetime.strptime(time_filter, '%H:%M').time()
@@ -239,7 +220,7 @@ def student():
                 et = _to_minute_dt(row.get('assign_end'))
                 if not st or not et:
                     continue
-                # Match if requested time falls within [start, end)
+               
                 if not (st.time() <= req_time < et.time()):
                     continue
             else:
@@ -250,7 +231,7 @@ def student():
 
         results.append(row)
 
-        # Track which courses have at least one room assignment
+        # Track which courses have at least one room assigned 
         course_key = row.get('course_id')
         if course_key not in available_courses:
             available_courses[course_key] = {
@@ -260,8 +241,7 @@ def student():
                 'dept_name': row.get('dept_name'),
             }
 
-    # Student has no session-based identity; pass user=None
-    # Sort available classes by department and course name for a tidy dropdown
+
     available_classes = sorted(
         available_courses.values(),
         key=lambda c: (
@@ -323,12 +303,12 @@ def secretary():
     except Exception as e:
         print('Error fetching equipment types (secretary):', e)
 
-    # Map equipment requests by class request id for easy lookup in template
+
     request_equipment_by_request = {
         re.get('request_id'): re for re in request_equipment
     }
 
-    # Simple mapping from equipment id to name (best-effort; falls back to id)
+
     equipment_name_by_id = {
         et.get('equip_id'): et.get('name') or et.get('eq_description') or et.get('description') or ''
         for et in equipment_types
@@ -386,7 +366,7 @@ def create_class_request():
     except Exception as e:
         print('Error inserting class request:', e)
 
-    # If equipment was selected, create a linked equipment request row
+    
     if new_request_id and equipment_id:
         try:
             qty = int(quantity_raw) if quantity_raw else 1
@@ -490,7 +470,7 @@ def admin():
     except Exception as e:
         print('Error fetching request equipment (admin):', e)
 
-    # Map equipment requests by class request id and names for display
+
     request_equipment_by_request = {re.get('request_id'): re for re in request_equipment}
     equipment_name_by_id = {
         et.get('equip_id'): et.get('name') or et.get('eq_description') or et.get('description') or ''
@@ -528,16 +508,14 @@ def accept_request(request_id: int):
             return redirect(url_for('admin'))
         req = resp.data[0]
 
-        # Check for time conflict in the same room.
-        # Normalize timestamps to minute precision (YYYY-MM-DDTHH:MM) so
-        # HTML datetime-local values and Supabase stored values align.
+
         new_start_raw = req.get('requested_start')
         new_end_raw = req.get('requested_end')
 
         def _to_minute_dt(value: str):
             if not value:
                 return None
-            # Take only "YYYY-MM-DDTHH:MM" part
+           
             trimmed = value[:16]
             try:
                 return datetime.fromisoformat(trimmed)
@@ -549,7 +527,7 @@ def accept_request(request_id: int):
         ne = _to_minute_dt(new_end_raw)
 
         if ns and ne:
-            # Check for conflicts with existing room assignments
+            
             try:
                 existing_resp = supabase.table('Room Assignment').select('start,end').eq('room_id', int(room_id)).execute()
                 for ra in existing_resp.data:
@@ -560,13 +538,13 @@ def accept_request(request_id: int):
                     if not es or not ee:
                         continue
 
-                    # Overlap if new_start < existing_end and existing_start < new_end
+                    
                     if ns < ee and es < ne:
                         return redirect(url_for('admin', error='That room is already booked for this time slot. Please choose another room.'))
             except Exception as e_conflict:
                 print('Error checking for room conflicts:', e_conflict)
 
-            # Also check for conflicts with blackout hours for this room
+            
             try:
                 blackout_resp = supabase.table('Blackout Hours').select('start,end').eq('room_id', int(room_id)).execute()
                 for bo in blackout_resp.data:
@@ -592,7 +570,7 @@ def accept_request(request_id: int):
         }
         supabase.table('Room Assignment').insert(payload).execute()
 
-        # If there is a linked equipment request, apply it to Room Equipment for this room
+       
         try:
             eq_resp = supabase.table('Request Equipment').select('*').eq('request_id', request_id).execute()
             if eq_resp.data:
@@ -606,7 +584,7 @@ def accept_request(request_id: int):
         except Exception as e_eq_apply:
             print('Error applying room equipment for accepted request:', e_eq_apply)
 
-        # Also mark the class request as assigned
+        
         try:
             supabase.table('Class Request').update({'status': 'assigned'}).eq('request_id', request_id).execute()
         except Exception as e_update:
@@ -623,7 +601,7 @@ def suggest_room(request_id: int):
         return redirect(url_for('login'))
 
     try:
-        # Load the class request we are trying to schedule
+        
         resp = supabase.table('Class Request').select('*').eq('request_id', request_id).execute()
         if not resp.data:
             return redirect(url_for('admin', error='Class request not found.'))
@@ -647,7 +625,7 @@ def suggest_room(request_id: int):
         if not (ns and ne):
             return redirect(url_for('admin', error='Request is missing valid start/end times.'))
 
-        # Load all rooms and prefer ones in the same building as the preferred_room text, if any
+        
         rooms_resp = supabase.table('Room').select('*').execute()
         rooms = rooms_resp.data or []
 
@@ -662,7 +640,7 @@ def suggest_room(request_id: int):
         rooms_sorted = sorted(rooms, key=room_sort_key)
 
         def is_room_free(room_id: int) -> bool:
-            # Check existing assignments
+            
             try:
                 existing_resp = supabase.table('Room Assignment').select('start,end').eq('room_id', room_id).execute()
                 for ra in existing_resp.data:
@@ -676,7 +654,7 @@ def suggest_room(request_id: int):
                 print('Error checking room assignments for suggestion:', e_conflict)
                 return False
 
-            # Check blackout hours
+            
             try:
                 blackout_resp = supabase.table('Blackout Hours').select('start,end').eq('room_id', room_id).execute()
                 for bo in blackout_resp.data:
@@ -708,7 +686,7 @@ def suggest_room(request_id: int):
         if not suggested_room:
             return redirect(url_for('admin', error='No available room found for this time slot.'))
 
-        # Auto-create the room assignment for the suggested room
+       
         try:
             room_id = int(suggested_room.get('room_id'))
         except Exception:
@@ -728,7 +706,7 @@ def suggest_room(request_id: int):
             print('Error inserting suggested room assignment:', e_insert)
             return redirect(url_for('admin', error='Failed to create room assignment for suggested room.'))
 
-        # Apply any requested equipment to Room Equipment
+        
         try:
             eq_resp = supabase.table('Request Equipment').select('*').eq('request_id', request_id).execute()
             if eq_resp.data:
@@ -742,7 +720,7 @@ def suggest_room(request_id: int):
         except Exception as e_eq_apply:
             print('Error applying room equipment for suggested room:', e_eq_apply)
 
-        # Mark the class request as assigned
+        
         try:
             supabase.table('Class Request').update({'status': 'assigned'}).eq('request_id', request_id).execute()
         except Exception as e_update:
@@ -786,7 +764,7 @@ def update_assignment(assignment_id: int):
         return redirect(url_for('admin', error='Invalid start or end time for assignment update.'))
 
     try:
-        # Check for conflicts with other assignments for this room (exclude this assignment)
+       
         existing_resp = supabase.table('Room Assignment').select('assignment_id, start, end').eq('room_id', int(new_room_id)).execute()
         for ra in existing_resp.data:
             if ra.get('assignment_id') == assignment_id or ra.get('assign_id') == assignment_id:
@@ -798,7 +776,7 @@ def update_assignment(assignment_id: int):
             if ns < ee and es < ne:
                 return redirect(url_for('admin', error='Updated time conflicts with another assignment in that room.'))
 
-        # Check blackout hours for the new room/time
+        
         blackout_resp = supabase.table('Blackout Hours').select('start,end').eq('room_id', int(new_room_id)).execute()
         for bo in blackout_resp.data:
             bs = _to_minute_dt(bo.get('start'))
@@ -808,7 +786,7 @@ def update_assignment(assignment_id: int):
             if ns < be and bs < ne:
                 return redirect(url_for('admin', error='Updated time falls within blackout hours for that room.'))
 
-        # If we reach here, it is safe to update the assignment
+        
         update_payload = {
             'room_id': int(new_room_id),
             'start': new_start_raw,
@@ -836,7 +814,6 @@ def add_blackout():
     try:
         payload = {
             'room_id': int(room_id) if room_id else None,
-            # Table uses columns named start and end
             'start': start,
             'end': end,
             'reason': reason,
