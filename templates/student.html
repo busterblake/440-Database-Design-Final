@@ -177,13 +177,13 @@
                     </div>
 
                     <div>
-                        <label for="time" style="display:block;margin-bottom:4px;font-weight:600;">Time (text match)</label>
-                        <input type="text" id="time" name="time" value="{{ time_filter or '' }}"
-                               placeholder="e.g. 09:00"
+                        <label for="time" style="display:block;margin-bottom:4px;font-weight:600;">Time of Day</label>
+                        <input type="time" id="time" name="time" value="{{ time_filter or '' }}"
                                style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #ccc;">
                     </div>
 
-                    <div style="grid-column:1 / -1;text-align:right;margin-top:8px;">
+                        <div style="grid-column:1 / -1;text-align:right;margin-top:8px;display:flex;justify-content:flex-end;gap:8px;">
+                            <a href="/student" style="padding:8px 16px;border-radius:4px;border:1px solid #ccc;background:#fff;color:#333;text-decoration:none;font-size:14px;">Clear</a>
                         <button type="submit" class="logout-btn" style="background-color:#27ae60;">Search</button>
                     </div>
                 </form>

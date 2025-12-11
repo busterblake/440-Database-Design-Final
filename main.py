@@ -149,6 +149,18 @@ def student():
     # Track which **courses** actually have room assignments so we can
     # build a dropdown of available classes (by course) for students to search.
     available_courses = {}
+    # Helper to parse stored datetimes down to minutes
+    def _to_minute_dt(value: str):
+        if not value:
+            return None
+        text = str(value).replace(' ', 'T')
+        trimmed = text[:16]
+        try:
+            return datetime.fromisoformat(trimmed)
+        except Exception as parse_err:
+            print('Error parsing datetime in student search:', value, parse_err)
+            return None
+
     for ra in room_assignments:
         s = section_by_id.get(ra.get('section_id'))
         if not s:
@@ -214,10 +226,27 @@ def student():
         if dept_id and str(row.get('dept_id')) != dept_id:
             continue
         if time_filter:
-            start_str = str(row.get('assign_start') or '')
-            end_str = str(row.get('assign_end') or '')
-            if time_filter not in start_str and time_filter not in end_str:
-                continue
+            # Expect HH:MM from a time input; if parsing fails, fall back to simple substring match
+            from datetime import time as _time_cls  # local alias to avoid confusion
+            req_time = None
+            try:
+                req_time = datetime.strptime(time_filter, '%H:%M').time()
+            except Exception:
+                req_time = None
+
+            if req_time:
+                st = _to_minute_dt(row.get('assign_start'))
+                et = _to_minute_dt(row.get('assign_end'))
+                if not st or not et:
+                    continue
+                # Match if requested time falls within [start, end)
+                if not (st.time() <= req_time < et.time()):
+                    continue
+            else:
+                start_str = str(row.get('assign_start') or '')
+                end_str = str(row.get('assign_end') or '')
+                if time_filter not in start_str and time_filter not in end_str:
+                    continue
 
         results.append(row)
 
