@@ -138,8 +138,8 @@
 </head>
 <body>
     <div class="login-container">
-        <h1>🔐 Login</h1>
-        <p>Demo login: select a role and use the same word as the password (e.g., admin/admin)</p>
+        <h1>🔐 Staff Login</h1>
+        <p>Students do not need a password. Use this form for <strong>department secretaries</strong> and <strong>administrators</strong> only.<br>Admin: <code>admin</code> | Secretary: <code>secretary</code></p>
         
         {% if error %}
         <div class="error">{{ error }}</div>
@@ -150,7 +150,6 @@
             <div class="form-group">
                 <label for="role">Role</label>
                 <select id="role" name="role" required>
-                    <option value="student">Student</option>
                     <option value="admin">Admin</option>
                     <option value="secretary">Secretary</option>
                 </select>
@@ -169,7 +168,7 @@
         </form>
         
         <div class="signup-link">
-            Don't have an account? <a href="/signup">Sign up here</a>
+            Students can access the search at <a href="/student">/student</a> without logging in.
         </div>
     </div>
     

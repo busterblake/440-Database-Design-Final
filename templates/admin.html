@@ -65,10 +65,46 @@
             min-height: 500px;
         }
         
-        .content h2 {
+        .content p {
             color: #667eea;
             margin-bottom: 30px;
             font-size: 32px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 20px;
+            margin-top: 24px;
+        }
+
+        .panel {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+        }
+
+        .panel h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 6px 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #eef2ff;
+            font-weight: 600;
         }
         
         .content p {
@@ -104,12 +140,296 @@
             <h2>🛠️ Welcome to the Admin Dashboard</h2>
             {% if user %}
             <div class="user-info" style="background-color:#f0f4ff;padding:15px;border-radius:8px;margin-bottom:30px;border-left:4px solid #667eea;">
-                <p><strong>Logged in as:</strong> {{ user.email }}</p>
-                <p><strong>User ID:</strong> {{ user.id }}</p>
+                <p><strong>Role:</strong> {{ user.role if user.role else 'admin' }}</p>
             </div>
             {% endif %}
-            <p>Add your admin-specific content here. This dashboard is personalized for you after login.</p>
-            <!-- Add your content here -->
+            {% if error %}
+            <div style="background-color:#ffebee;color:#c62828;padding:12px 16px;border-radius:8px;margin-bottom:20px;border-left:4px solid #c62828;">
+                {{ error }}
+            </div>
+            {% endif %}
+        
+
+            <div class="panel" style="margin-bottom:24px;">
+                <h3>Accept Class Requests</h3>
+                {% if class_requests %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Request ID</th>
+                            <th>Section</th>
+                            <th>Requester</th>
+                            <th>Requested Start</th>
+                            <th>Requested End</th>
+                            <th>Preferred Room</th>
+                            <th>Equipment Request</th>
+                            <th>Status</th>
+                            <th>Assign To Room</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cr in class_requests %}
+                        <tr>
+                            <td>{{ cr.request_id }}</td>
+                            <td>{{ cr.section_id }}</td>
+                            <td>{{ cr.requester }}</td>
+                            <td>{{ cr.requested_start|pretty_datetime }}</td>
+                            <td>{{ cr.requested_end|pretty_datetime }}</td>
+                            <td>{{ cr.preferred_room }}</td>
+                            <td>
+                                {% set re = request_equipment_by_request.get(cr.request_id) %}
+                                {% if re %}
+                                    {% set eq_name = equipment_name_by_id.get(re.equip_id) %}
+                                    {{ eq_name or ('Equipment ' ~ re.equip_id) }} (x{{ re.quantity }})
+                                {% else %}
+                                    None
+                                {% endif %}
+                            </td>
+                            <td>{{ cr.status or 'pending' }}</td>
+                            <td>
+                                {% if cr.status == 'assigned' %}
+                                    <span style="font-size:11px;color:#27ae60;">Already assigned</span>
+                                {% else %}
+                                    <form method="POST" action="/admin/assign/{{ cr.request_id }}">
+                                        <select name="room_id" style="font-size:11px;">
+                                            <option value="">Select room</option>
+                                            {% for r in rooms %}
+                                                <option value="{{ r.room_id }}">{{ r.building_id }}-{{ r.room_num }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <button type="submit" style="font-size:11px;padding:4px 8px;">Accept</button>
+                                    </form>
+                                    <form method="POST" action="/admin/suggest_room/{{ cr.request_id }}" style="margin-top:4px;">
+                                        <button type="submit" style="font-size:11px;padding:4px 8px;background-color:#2980b9;color:#fff;border:none;border-radius:4px;">Suggest Room</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                    <p>No pending class requests.</p>
+                {% endif %}
+            </div>
+
+            <div class="panel" style="margin-bottom:24px;">
+                <h3>Add Blackout Hours</h3>
+                <form method="POST" action="/admin/blackout" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
+                    <div>
+                        <label for="room_id" style="display:block;margin-bottom:4px;font-weight:600;">Room</label>
+                        <select id="room_id" name="room_id" required
+                                style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #ccc;">
+                            {% for r in rooms %}
+                                <option value="{{ r.room_id }}">{{ r.building_id }}-{{ r.room_num }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="blackout_start" style="display:block;margin-bottom:4px;font-weight:600;">Blackout Start</label>
+                        <input type="datetime-local" id="blackout_start" name="blackout_start" required
+                               style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #ccc;">
+                    </div>
+                    <div>
+                        <label for="blackout_end" style="display:block;margin-bottom:4px;font-weight:600;">Blackout End</label>
+                        <input type="datetime-local" id="blackout_end" name="blackout_end" required
+                               style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #ccc;">
+                    </div>
+                    <div>
+                        <label for="reason" style="display:block;margin-bottom:4px;font-weight:600;">Reason</label>
+                        <input type="text" id="reason" name="reason" placeholder="e.g. Maintenance" 
+                               style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #ccc;">
+                    </div>
+                    <div style="grid-column:1 / -1;text-align:right;margin-top:8px;">
+                        <button type="submit" style="padding:8px 16px;background:#e67e22;color:#fff;border:none;border-radius:4px;cursor:pointer;">Add Blackout</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="panel" style="margin-top:24px;">
+                <h3>Room Assignments (Admin Edit)</h3>
+                {% if room_assignments %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Section</th>
+                            <th>Room</th>
+                            <th>Start</th>
+                            <th>End</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ra in room_assignments %}
+                        <tr>
+                            <td>{{ ra.assignment_id or ra.assign_id }}</td>
+                            <td>{{ ra.section_id }}</td>
+                            <td>{{ ra.room_id }}</td>
+                            <td>{{ ra.start|pretty_datetime }}</td>
+                            <td>{{ ra.end|pretty_datetime }}</td>
+                            <td>{{ ra.status }}</td>
+                            <td>
+                                <form method="POST" action="/admin/assignment/{{ ra.assignment_id or ra.assign_id }}" style="display:flex;flex-direction:column;gap:4px;">
+                                    <div>
+                                        <select name="room_id" style="font-size:11px;">
+                                            {% for r in rooms %}
+                                                <option value="{{ r.room_id }}" {% if r.room_id == ra.room_id %}selected{% endif %}>{{ r.building_id }}-{{ r.room_num }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <input type="datetime-local" name="start" value="{{ ra.start }}" style="font-size:11px;width:100%;">
+                                    </div>
+                                    <div>
+                                        <input type="datetime-local" name="end" value="{{ ra.end }}" style="font-size:11px;width:100%;">
+                                    </div>
+                                    <button type="submit" style="font-size:11px;padding:4px 8px;">Update</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                    <p>No room assignments found.</p>
+                {% endif %}
+            </div>
+
+            <div class="grid">
+                <div class="panel">
+                    <h3>Buildings</h3>
+                    {% if buildings %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for b in buildings %}
+                            <tr>
+                                <td>{{ b.building_id }}</td>
+                                <td>{{ b.building_name }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                        <p>No building data found.</p>
+                    {% endif %}
+                </div>
+
+                <div class="panel">
+                    <h3>Departments</h3>
+                    {% if departments %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Building</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in departments %}
+                            <tr>
+                                <td>{{ d.dept_id }}</td>
+                                <td>{{ d.dept_name }}</td>
+                                <td>{{ d.building_id }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                        <p>No department data found.</p>
+                    {% endif %}
+                </div>
+
+                <div class="panel">
+                    <h3>Courses</h3>
+                    {% if courses %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Dept</th>
+                                <th>Number</th>
+                                <th>Credits</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in courses %}
+                            <tr>
+                                <td>{{ c.course_id }}</td>
+                                <td>{{ c.dept_id }}</td>
+                                <td>{{ c.course_num }}</td>
+                                <td>{{ c.num_credits }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                        <p>No course data found.</p>
+                    {% endif %}
+                </div>
+
+                <div class="panel">
+                    <h3>Rooms</h3>
+                    {% if rooms %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Building</th>
+                                <th>Room</th>
+                                <th>Type</th>
+                                <th>Capacity</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in rooms %}
+                            <tr>
+                                <td>{{ r.room_id }}</td>
+                                <td>{{ r.building_id }}</td>
+                                <td>{{ r.room_num }}</td>
+                                <td>{{ r.room_type }}</td>
+                                <td>{{ r.max_capacity }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                        <p>No room data found.</p>
+                    {% endif %}
+                </div>
+
+                <div class="panel">
+                    <h3>Equipment Types</h3>
+                    {% if equipment_types %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for e in equipment_types %}
+                            <tr>
+								<td>{{ e.equip_id }}</td>
+								<td>{{ e.name }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                        <p>No equipment type data found.</p>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
     

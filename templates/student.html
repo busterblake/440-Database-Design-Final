@@ -121,28 +121,111 @@
 </head>
 <body>
     <nav class="navbar">
-        <h1>📊 Student Dashboard</h1>
+        <h1>📊 Student Classroom Search</h1>
         <ul class="nav-links">
             <li><a href="/">Home</a></li>
-            <li><a href="/secretary">Secretary</a></li>
-            <li><a href="/admin">Admin</a></li>
-            <li><a href="/logout" class="logout-btn">Logout</a></li>
+            <li><a href="/student">Student</a></li>
+            <li><a href="/login">Staff Login</a></li>
         </ul>
     </nav>
     
     <div class="container">
         <div class="content">
-            <h2>🎓 Welcome to Your Student Dashboard</h2>
-            
-            {% if user %}
-            <div class="user-info">
-                <p><strong>Logged in as:</strong> {{ user.email }}</p>
-                <p><strong>User ID:</strong> {{ user.id }}</p>
+            <h2>🎓 Search Classroom Assignments</h2>
+
+            <p>Use this interface to query <strong>classroom information</strong> by class number, building, time, and department (or any combination). This is read-only and does not require a login.</p>
+
+            <div style="margin-top:24px;background:#f9fafb;padding:20px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.06);">
+                <form method="GET" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
+                    <div>
+                        <label for="class_number" style="display:block;margin-bottom:4px;font-weight:600;">Class</label>
+                        <select id="class_number" name="class_number"
+                                style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #ccc;">
+                            <option value="">Any</option>
+                            {% for c in available_classes %}
+								<option value="{{ c.course_id }}" {% if class_number == c.course_id|string %}selected{% endif %}>
+									{{ c.course_name or c.course_id }} ({{ c.dept_name or c.dept_id }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="building_id" style="display:block;margin-bottom:4px;font-weight:600;">Building</label>
+                        <select id="building_id" name="building_id"
+                                style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #ccc;">
+                            <option value="">Any</option>
+                            {% for b in buildings %}
+                                <option value="{{ b.building_id }}" {% if selected_building == b.building_id|string %}selected{% endif %}>
+                                    {{ b.building_id }} - {{ b.building_name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="dept_id" style="display:block;margin-bottom:4px;font-weight:600;">Department</label>
+                        <select id="dept_id" name="dept_id"
+                                style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #ccc;">
+                            <option value="">Any</option>
+                            {% for d in departments %}
+								<option value="{{ d.department_id }}" {% if selected_dept == d.department_id|string %}selected{% endif %}>
+									{{ d.department_id }} - {{ d.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="time" style="display:block;margin-bottom:4px;font-weight:600;">Time (text match)</label>
+                        <input type="text" id="time" name="time" value="{{ time_filter or '' }}"
+                               placeholder="e.g. 09:00"
+                               style="width:100%;padding:8px 10px;border-radius:4px;border:1px solid #ccc;">
+                    </div>
+
+                    <div style="grid-column:1 / -1;text-align:right;margin-top:8px;">
+                        <button type="submit" class="logout-btn" style="background-color:#27ae60;">Search</button>
+                    </div>
+                </form>
             </div>
-            {% endif %}
-            
-            <p>Add your student-specific content here. This dashboard is personalized for you after login.</p>
-            <!-- Add your content here -->
+
+            <div style="margin-top:24px;background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.06);">
+                <h3 style="margin-bottom:12px;color:#333;">Search Results</h3>
+                {% if results and results|length > 0 %}
+                    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                        <thead>
+                            <tr>
+                                <th style="border:1px solid #ddd;padding:6px 8px;">Course</th>
+                                <th style="border:1px solid #ddd;padding:6px 8px;">Department</th>
+                                <th style="border:1px solid #ddd;padding:6px 8px;">Section</th>
+                                <th style="border:1px solid #ddd;padding:6px 8px;">Building</th>
+                                <th style="border:1px solid #ddd;padding:6px 8px;">Room</th>
+                                <th style="border:1px solid #ddd;padding:6px 8px;">Type</th>
+                                <th style="border:1px solid #ddd;padding:6px 8px;">Capacity</th>
+                                <th style="border:1px solid #ddd;padding:6px 8px;">Start</th>
+                                <th style="border:1px solid #ddd;padding:6px 8px;">End</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in results %}
+                            <tr>
+								<td style="border:1px solid #ddd;padding:6px 8px;">{{ row.course_name or row.course_id }}</td>
+                                <td style="border:1px solid #ddd;padding:6px 8px;">{{ row.dept_name }} ({{ row.dept_id }})</td>
+                                <td style="border:1px solid #ddd;padding:6px 8px;">{{ row.section_type }} {{ row.section_num }} [{{ row.section_id }}]</td>
+                                <td style="border:1px solid #ddd;padding:6px 8px;">{{ row.building_id }}</td>
+                                <td style="border:1px solid #ddd;padding:6px 8px;">{{ row.room_num }}</td>
+                                <td style="border:1px solid #ddd;padding:6px 8px;">{{ row.room_type }}</td>
+                                <td style="border:1px solid #ddd;padding:6px 8px;">{{ row.max_capacity }}</td>
+                                <td style="border:1px solid #ddd;padding:6px 8px;">{{ row.assign_start|pretty_datetime }}</td>
+                                <td style="border:1px solid #ddd;padding:6px 8px;">{{ row.assign_end|pretty_datetime }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p style="color:#666;">No matching classroom assignments found. Adjust your filters and try again.</p>
+                {% endif %}
+            </div>
         </div>
     </div>
     
